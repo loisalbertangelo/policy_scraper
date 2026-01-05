@@ -65,10 +65,5 @@ The filter currently looks for:
 
 ## Notes
 
-- API delay: ~0.5 seconds between session requests to respect rate limits
 - Approximate runtime: ~2–3 minutes for full 2008–present run
 - Free LegiScan API access may be limited to current or recent sessions; historical coverage can depend on your account level
-
-***
-
-You can now copy this markdown text directly into your GitHub repository's README.md file.
