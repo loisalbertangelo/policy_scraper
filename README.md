@@ -1,2 +1,74 @@
 # policy_scraper
-A scraper for aging-related legislation.
+Automated tool to extract and analyze aging-related legislation from Virginia's legislative sessions using the LegiScan API.
+
+## Overview
+
+Retrieves **all Virginia legislative bills** from 2008 onwards and filters for aging-related content using predefined keywords.
+
+## Features
+
+- **Comprehensive Coverage**: All VA sessions from 2008-present (31 sessions)
+- **Smart Filtering**: 20+ keywords (elderly, senior, Medicare, long-term care, etc.)
+- **Robust Handling**: Works with both dict and list API formats
+- **CSV Export**: Timestamped output files
+- **Progress Tracking**: Real-time session processing updates
+
+## Requirements
+
+```python
+requests
+pandas
+```
+
+## Setup
+
+1. Get LegiScan API key from [legiscan.com](https://legiscan.com/legiscan)
+2. Replace API key in the notebook/script:
+   ```python
+   os.environ["LEGISCAN_API_KEY"] = "your_key"
+   ```
+
+## Usage
+
+Run the main cell in the notebook. The script will:
+
+1. Fetch all Virginia legislative sessions via `getSessionList`
+2. Filter sessions from 2008 onwards
+3. For each session, call `getMasterList` to retrieve bills
+4. Filter bills using aging-related keywords
+5. Save results to `virginia_aging_bills_YYYYMMDD.csv`
+
+## Output Fields
+
+The CSV includes:
+
+- `session_year`, `session_name`, `session_id`
+- `bill_number`, `title`, `description`
+- `status`, `status_desc`
+- `last_action`, `last_action_date`
+- `url`, `state_link`
+- `matched_keywords` (comma-separated list of matched aging-related keywords)
+
+## Recent Results
+
+From a recent run:
+
+- **Total bills processed**: 57,322
+- **Aging-related bills found**: 2,729
+- **Sessions analyzed**: 31 (2008–2026)
+
+## Keywords
+
+The filter currently looks for:
+
+`aging, elderly, senior, geriatric, long-term care, nursing home, assisted living, caregiver, dementia, alzheimer, Medicare, Medicaid, social security, retirement, pension, older adult, elder abuse, elder neglect, elder justice, adult protective services, home health, hospice`
+
+## Notes
+
+- API delay: ~0.5 seconds between session requests to respect rate limits
+- Approximate runtime: ~2–3 minutes for full 2008–present run
+- Free LegiScan API access may be limited to current or recent sessions; historical coverage can depend on your account level
+
+***
+
+You can now copy this markdown text directly into your GitHub repository's README.md file.
