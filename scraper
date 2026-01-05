@@ -1,0 +1,153 @@
+import requests
+import os
+import pandas as pd
+import time
+from datetime import datetime
+
+# API Configuration
+os.environ["LEGISCAN_API_KEY"] = "XXX"
+api_key = os.environ["LEGISCAN_API_KEY"]
+base_url = "https://api.legiscan.com/"
+
+def call_legiscan_api(operation, params=None):
+    """Make API call to LegiScan"""
+    if params is None:
+        params = {}
+    params['key'] = api_key
+    params['op'] = operation
+    
+    try:
+        response = requests.get(base_url, params=params)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print(f"Error: {response.status_code}")
+            return None
+    except Exception as e:
+        print(f"Exception: {e}")
+        return None
+
+# Fetch Virginia sessions
+print("Fetching Virginia sessions...")
+session_data = call_legiscan_api('getSessionList', {'state': 'VA'})
+
+if not session_data or 'sessions' not in session_data:
+    print("Failed to fetch session data.")
+    exit()
+
+sessions = session_data['sessions']
+print(f"Found {len(sessions)} sessions\n")
+
+# Filter sessions from 2008 onwards
+filtered_sessions = []
+if isinstance(sessions, dict):
+    for session_id_str, session_info in sessions.items():
+        year_start = session_info.get('year_start', 0)
+        if year_start >= 2008:
+            filtered_sessions.append({
+                'id': int(session_id_str),
+                'name': session_info.get('session_name', ''),
+                'year': year_start
+            })
+else:
+    for session_info in sessions:
+        year_start = session_info.get('year_start', 0)
+        if year_start >= 2008:
+            filtered_sessions.append({
+                'id': session_info.get('session_id', 0),
+                'name': session_info.get('session_name', ''),
+                'year': year_start
+            })
+
+filtered_sessions = sorted(filtered_sessions, key=lambda x: x['year'])
+print(f"Processing {len(filtered_sessions)} sessions from 2008 onwards\n")
+
+# Keywords for filtering aging-related bills
+keywords = [
+    'aging', 'elderly', 'senior', 'geriatric',
+    'long-term care', 'nursing home', 'assisted living',
+    'caregiver', 'dementia', 'alzheimer',
+    'medicare', 'medicaid', 'social security',
+    'retirement', 'pension', 'older adult',
+    'elder abuse', 'elder neglect', 'elder justice',
+    'adult protective services', 'home health', 'hospice'
+]
+
+# Process all sessions
+all_aging_bills = []
+total_bills = 0
+
+for i, session in enumerate(filtered_sessions, 1):
+    session_id = session['id']
+    session_name = session['name']
+    session_year = session['year']
+    
+    print(f"[{i}/{len(filtered_sessions)}] {session_year} - {session_name}...", end=" ")
+    
+    master_list = call_legiscan_api('getMasterList', {'id': session_id})
+    
+    if not master_list or 'masterlist' not in master_list:
+        print("No data")
+        continue
+    
+    bills_dict = master_list['masterlist']
+    bill_count = sum(1 for k in bills_dict.keys() if k != 'session')
+    total_bills += bill_count
+    
+    session_aging_bills = 0
+    for bill_id, bill_info in bills_dict.items():
+        if bill_id == 'session':
+            continue
+        
+        title = (bill_info.get('title') or '').lower()
+        description = (bill_info.get('description') or '').lower()
+        
+        matched_keywords = [kw for kw in keywords if kw.lower() in title or kw.lower() in description]
+        
+        if matched_keywords:
+            session_aging_bills += 1
+            all_aging_bills.append({
+                'session_year': session_year,
+                'session_name': session_name,
+                'session_id': session_id,
+                'bill_number': bill_info.get('bill_number', ''),
+                'title': bill_info.get('title', ''),
+                'description': bill_info.get('description', ''),
+                'status': bill_info.get('status', ''),
+                'status_desc': bill_info.get('status_desc', ''),
+                'last_action': bill_info.get('last_action', ''),
+                'last_action_date': bill_info.get('last_action_date', ''),
+                'url': bill_info.get('url', ''),
+                'state_link': bill_info.get('state_link', ''),
+                'matched_keywords': ', '.join(matched_keywords)
+            })
+    
+    print(f"{bill_count} bills, {session_aging_bills} aging-related")
+    time.sleep(0.5)
+
+# Summary
+print(f"\n{'='*60}")
+print(f"Total bills: {total_bills}")
+print(f"Aging-related bills: {len(all_aging_bills)}")
+print(f"{'='*60}\n")
+
+# Save results
+if all_aging_bills:
+    df = pd.DataFrame(all_aging_bills)
+    df = df.sort_values(['session_year', 'bill_number'], ascending=[False, True])
+    
+    print("=== Sample Results ===")
+    print(df[['session_year', 'bill_number', 'title']].head(15))
+    
+    filename = f'virginia_aging_bills_{datetime.now().strftime("%Y%m%d")}.csv'
+    df.to_csv(filename, index=False)
+    print(f"\nData saved to: {filename}")
+    
+    print("\n=== Bills by Year ===")
+    year_counts = df['session_year'].value_counts().sort_index(ascending=False)
+    for year, count in year_counts.items():
+        print(f"{year}: {count} bills")
+else:
+    print("No aging-related bills found.")
+
+print("\n=== Complete ===")
